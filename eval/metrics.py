@@ -1,8 +1,13 @@
 """Retrieval metrics for timestamped segments.
 
 Hit rule: a retrieved segment is relevant when it contains the midpoint of a
-labeled relevant span. A span credits only the first segment that covers it,
-so nDCG cannot exceed 1 when several overlapping segments hit the same span.
+labeled relevant span. A span credits only the first segment that covers it.
+The gain is the span grade (1 partial, 2 exact). A two-item span counts as
+grade 1, which is the old binary label.
+
+Hard-negative queries (type ``negative``) have no relevant span. They are
+reported and left out of the Recall, MRR, and nDCG averages: the retriever
+always returns neighbors, so scoring them as misses would zero the metric.
 """
 
 from __future__ import annotations
@@ -16,8 +21,14 @@ def contains_midpoint(start: float, end: float, span: list[float] | tuple[float,
     return start - 1e-6 <= mid <= end + 1e-6
 
 
+def span_grade(span: list | tuple) -> int:
+    if len(span) >= 3:
+        return int(span[2])
+    return 1
+
+
 def relevance_flags(results: list[dict], spans: list) -> list[int]:
-    remaining = [tuple(span) for span in spans]
+    remaining = [(float(span[0]), float(span[1]), span_grade(span)) for span in spans]
     flags: list[int] = []
     for result in results:
         matched = None
@@ -28,8 +39,7 @@ def relevance_flags(results: list[dict], spans: list) -> list[int]:
         if matched is None:
             flags.append(0)
         else:
-            flags.append(1)
-            remaining.pop(matched)
+            flags.append(remaining.pop(matched)[2])
     return flags
 
 
@@ -47,20 +57,36 @@ def reciprocal_rank(flags: list[int], k: int) -> float:
 def dcg(flags: list[int]) -> float:
     total = 0.0
     for index, flag in enumerate(flags):
-        if flag:
-            total += 1.0 / math.log2(index + 2)
+        gain = float(flag)
+        if gain:
+            total += gain / math.log2(index + 2)
     return total
 
 
-def ndcg_at_k(flags: list[int], k: int, n_relevant: int) -> float:
-    if n_relevant <= 0:
-        return 0.0
+def ndcg_at_k(
+    flags: list[int],
+    k: int,
+    n_relevant: int | None = None,
+    *,
+    ideal_gains: list[int] | None = None,
+) -> float:
+    if ideal_gains is None:
+        if not n_relevant or n_relevant <= 0:
+            return 0.0
+        ideal_gains = [1] * int(n_relevant)
+    else:
+        ideal_gains = [int(gain) for gain in ideal_gains if gain]
+        if not ideal_gains:
+            return 0.0
     gained = flags[:k]
-    ideal_len = min(k, n_relevant)
-    ideal = dcg([1] * ideal_len)
+    ideal = dcg(sorted(ideal_gains, reverse=True)[:k])
     if ideal == 0:
         return 0.0
     return dcg(gained) / ideal
+
+
+def is_hard_negative(query: dict) -> bool:
+    return query.get("type") == "negative" or bool(query.get("hard_negative"))
 
 
 def evaluate(queries: list[dict], search_fn, ks: tuple[int, ...] = (1, 5, 10)) -> dict:
@@ -68,20 +94,29 @@ def evaluate(queries: list[dict], search_fn, ks: tuple[int, ...] = (1, 5, 10)) -
     max_k = max(ks)
     per_query = []
     buckets: dict[str, list] = defaultdict(list)
+    hard_negatives = 0
     for query in queries:
-        results = list(search_fn(query["query"], query.get("video_id")))
-        flags = relevance_flags(results, query.get("relevant_spans") or [])
-        n_rel = len(query.get("relevant_spans") or [])
         row = {
             "query_id": query.get("query_id"),
             "type": query.get("type", ""),
             "split": query.get("split", ""),
         }
+        if is_hard_negative(query):
+            hard_negatives += 1
+            row["hard_negative"] = True
+            row["scored"] = False
+            per_query.append(row)
+            continue
+        results = list(search_fn(query["query"], query.get("video_id")))
+        spans = query.get("relevant_spans") or []
+        flags = relevance_flags(results, spans)
+        grades = [span_grade(span) for span in spans]
         for k in ks:
             row[f"recall@{k}"] = recall_at_k(flags, k)
         row["mrr@10"] = reciprocal_rank(flags, min(10, max_k))
-        row["ndcg@10"] = ndcg_at_k(flags, min(10, max_k), n_rel)
-        row["first_relevant_rank"] = next((i for i, f in enumerate(flags, 1) if f), None)
+        row["ndcg@10"] = ndcg_at_k(flags, min(10, max_k), ideal_gains=grades)
+        row["first_relevant_rank"] = next((i for i, flag in enumerate(flags, 1) if flag), None)
+        row["scored"] = True
         per_query.append(row)
         buckets[row["type"] or "unknown"].append(row)
         buckets["__all__"].append(row)
@@ -103,9 +138,13 @@ def evaluate(queries: list[dict], search_fn, ks: tuple[int, ...] = (1, 5, 10)) -
     return {
         "hit_rule": (
             "A hit is a segment that contains the midpoint of a relevant span. "
-            "Each span credits only the first covering segment."
+            "Each span credits only the first covering segment. "
+            "Gain is the span grade (default 1; 2 is an exact mention). "
+            "Hard negatives are excluded from the averages."
         ),
         "n_queries": len(queries),
+        "n_scored": sum(1 for row in per_query if row.get("scored")),
+        "hard_negatives": hard_negatives,
         "overall": average(buckets.get("__all__", [])),
         "by_type": by_type,
         "per_query": per_query,
@@ -136,5 +175,9 @@ def to_markdown(title: str, report: dict) -> str:
             lines.append(cells(name, stats))
         lines.append("")
     lines.append(report["hit_rule"])
+    if report.get("hard_negatives"):
+        lines.append(
+            f"Hard negatives in this file: {report['hard_negatives']}. They are not included in the averages."
+        )
     lines.append("")
     return "\n".join(lines)

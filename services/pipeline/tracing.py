@@ -61,15 +61,55 @@ class Tracer:
         if cost_usd:
             VLM_COST.labels(model=model or "unknown").inc(cost_usd)
         if self._langfuse is not None and not cache_hit:
-            try:
-                self._langfuse.start_generation(
-                    name=name,
-                    model=model,
-                    input=input,
-                    output=output,
-                    metadata=metadata or {},
-                    usage_details={"total_cost": cost_usd} if cost_usd else None,
-                )
-            except Exception as exc:  # noqa: BLE001
-                log.warning("Langfuse export failed: %s", type(exc).__name__)
+            self._export_langfuse(
+                name=name,
+                model=model,
+                input=input,
+                output=output,
+                cost_usd=cost_usd,
+                metadata=metadata,
+            )
         return record
+
+    def _export_langfuse(
+        self,
+        *,
+        name: str,
+        model: str,
+        input: Any,
+        output: Any,
+        cost_usd: float,
+        metadata: dict | None,
+    ) -> None:
+        """langfuse 5.2 has start_observation, not start_generation.
+
+        A failure here is a warning. The JSONL line is already written, and the
+        ingest job keeps going.
+        """
+        client = self._langfuse
+        try:
+            kwargs: dict[str, Any] = {
+                "as_type": "generation",
+                "name": name,
+                "input": input,
+                "output": output,
+                "metadata": metadata or {},
+            }
+            if model:
+                kwargs["model"] = model
+            if cost_usd:
+                kwargs["cost_details"] = {"total": float(cost_usd)}
+            observation = client.start_observation(**kwargs)
+            end = getattr(observation, "end", None)
+            if end is not None:
+                end()
+            flush = getattr(client, "flush", None)
+            if flush is not None:
+                flush()
+        except Exception as exc:  # noqa: BLE001
+            log.warning(
+                "Langfuse export failed for %s: %s: %s. The local trace was still written.",
+                name,
+                type(exc).__name__,
+                exc,
+            )

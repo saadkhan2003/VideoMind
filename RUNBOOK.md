@@ -183,7 +183,7 @@ Reindex after you change the embedder. The caption cache keys include the model 
 Target 150–200 queries on videos you have the right to use. About half spoken, about 30 percent visual, about 20 percent keyword. Mark 20 percent `dev` and the rest `test`. Use `eval/label_tool.py`. Then:
 
 ```bash
-python eval/run_eval.py --queries eval/queries.jsonl --split test --ablation all --out eval/results/final
+python -m eval.run_eval --queries eval/queries.jsonl --split test --ablation all --out eval/results/final
 ```
 
 Copy the numbers into the README table yourself. If you cannot explain a metric on a toy ranking, leave it off your CV. The prompts are at the bottom of `NOTES.md`.

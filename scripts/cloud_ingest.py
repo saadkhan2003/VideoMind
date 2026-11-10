@@ -6,6 +6,7 @@ LANGFUSE_PUBLIC_KEY, and LANGFUSE_SECRET_KEY. Does not print secret values.
 
     python scripts/cloud_ingest.py --dry-run
     python scripts/cloud_ingest.py --max-usd 0.15
+    python scripts/cloud_ingest.py --max-usd 0.15 --reindex hufsky-data-retention
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ sys.path[:0] = [str(ROOT / "services")]
 
 from pipeline.budget import UsdBudget  # noqa: E402
 from pipeline.config import get_settings  # noqa: E402
+from pipeline.download import download_file  # noqa: E402
 from pipeline.openrouter_models import estimated_caption_usd, resolve_vlm_model  # noqa: E402
 from pipeline.orchestrator import run_pipeline  # noqa: E402
 from pipeline.runtime import Resources  # noqa: E402
@@ -78,18 +80,25 @@ def missing_env(settings) -> list[str]:
 
 
 def download(url: str, dest: Path) -> None:
-    import httpx
-
+    dest = Path(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
     if dest.exists() and dest.stat().st_size > 0:
         print(f"already downloaded {dest.name}")
         return
     print(f"downloading {dest.name}")
-    with httpx.stream("GET", url, follow_redirects=True, timeout=120) as response:
-        response.raise_for_status()
-        with dest.open("wb") as handle:
-            for chunk in response.iter_bytes():
-                handle.write(chunk)
+    download_file(url, dest)
+
+
+def reindex_ids(requested: list[str], known_ids: list[str]) -> set[str]:
+    """Which already-indexed clips to run again. ``all`` means every known id."""
+    if not requested:
+        return set()
+    if "all" in requested:
+        return set(known_ids)
+    unknown = [item for item in requested if item not in known_ids]
+    if unknown:
+        raise SystemExit(f"unknown --reindex id: {', '.join(unknown)}")
+    return set(requested)
 
 
 def main() -> None:
@@ -104,6 +113,17 @@ def main() -> None:
         "--dry-run",
         action="store_true",
         help="Check env vars and print the vision model selected from live prices. No captions are requested.",
+    )
+    parser.add_argument(
+        "--reindex",
+        action="append",
+        default=[],
+        metavar="VIDEO_ID",
+        help=(
+            "Run this video again even if it is already indexed. "
+            "Repeat the flag, or pass --reindex all. Cached captions are not billed. "
+            "A new frame still counts against --max-usd."
+        ),
     )
     args = parser.parse_args()
     if args.max_usd <= 0:
@@ -148,6 +168,7 @@ def main() -> None:
 
     data = Path(settings.data_dir)
     clip_dir = data / "clips"
+    again = reindex_ids(args.reindex, [clip["video_id"] for clip in CLIPS])
     resources = Resources(settings)
     try:
         for clip in CLIPS:
@@ -172,9 +193,11 @@ def main() -> None:
                 )
                 resources.repo.create_job(job_id=uuid.uuid4().hex, video_id=video_id)
             job = resources.repo.latest_job(video_id)
-            if job and job["status"] == "indexed":
+            if job and job["status"] == "indexed" and video_id not in again:
                 print(f"{video_id} already indexed")
                 continue
+            if job and job["status"] == "indexed" and video_id in again:
+                print(f"{video_id} reindexing (caption cache hits cost $0; --max-usd still applies)")
             if job and job["status"] == "failed":
                 resources.repo.transition(job["id"], "queued")
             elif job is None:

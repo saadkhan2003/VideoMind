@@ -4,7 +4,7 @@ import logging
 import math
 from pathlib import Path
 
-from pipeline.media import grab_frame
+from pipeline.media import clamp_timestamp, grab_frame
 from pipeline.types import Keyframe
 
 log = logging.getLogger("videomind.scenes")
@@ -62,7 +62,7 @@ def keyframe_times(
 
             if not any(covered(ts) for ts in mids):
                 extra.append(min(duration, (left + right) / 2))
-    times = sorted({round(ts, 3) for ts in [*mids, *extra]})
+    times = sorted({round(clamp_timestamp(ts, duration), 3) for ts in [*mids, *extra]})
     return [ts for ts in times if 0 <= ts <= duration]
 
 
@@ -113,7 +113,7 @@ def extract_keyframes(
     for ts in times:
         frame_path = work_dir / f"frame_{ts:.3f}.jpg"
         try:
-            grab_frame(video_path, ts, frame_path)
+            grab_frame(video_path, ts, frame_path, duration=duration)
             hashed.append((ts, _phash(frame_path), frame_path))
         except Exception:
             log.exception("failed to grab frame at %.3f", ts)

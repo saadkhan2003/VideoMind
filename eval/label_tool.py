@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path[:0] = [str(ROOT)]
+sys.path[:0] = [str(ROOT), str(ROOT / "services"), str(ROOT / "services" / "api")]
 
 from eval.schema import append_record, load_jsonl  # noqa: E402
 
@@ -27,10 +27,11 @@ def main() -> None:
     add.add_argument("path", type=Path)
     add.add_argument("--id", required=True)
     add.add_argument("--query", required=True)
-    add.add_argument("--type", required=True, choices=["spoken", "visual", "keyword"])
+    add.add_argument("--type", required=True, choices=["spoken", "visual", "keyword", "negative"])
     add.add_argument("--video", required=True)
-    add.add_argument("--start", required=True, type=float)
-    add.add_argument("--end", required=True, type=float)
+    add.add_argument("--start", type=float, default=None)
+    add.add_argument("--end", type=float, default=None)
+    add.add_argument("--grade", type=int, default=1, choices=[1, 2])
     add.add_argument("--split", default="dev", choices=["dev", "test"])
 
     check = sub.add_parser("validate")
@@ -41,12 +42,18 @@ def main() -> None:
         rows = load_jsonl(args.path)
         print(f"{len(rows)} queries ok in {args.path}")
         return
+    if args.type == "negative":
+        spans: list = []
+    else:
+        if args.start is None or args.end is None:
+            raise SystemExit("--start and --end are required unless --type negative")
+        spans = [[args.start, args.end, args.grade]]
     record = {
         "query_id": args.id,
         "query": args.query,
         "type": args.type,
         "video_id": args.video,
-        "relevant_spans": [[args.start, args.end]],
+        "relevant_spans": spans,
         "split": args.split,
     }
     append_record(args.path, record)

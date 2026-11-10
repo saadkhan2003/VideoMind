@@ -4,8 +4,23 @@ import json
 from pathlib import Path
 
 REQUIRED = ("query_id", "query", "type", "video_id", "relevant_spans", "split")
-TYPES = {"spoken", "visual", "keyword"}
+TYPES = {"spoken", "visual", "keyword", "negative"}
 SPLITS = {"dev", "test"}
+GRADES = {1, 2}
+
+
+def parse_span(span: list | tuple) -> tuple[float, float, int]:
+    if not isinstance(span, (list, tuple)) or len(span) not in (2, 3):
+        raise ValueError(f"bad span {span}")
+    start, end = float(span[0]), float(span[1])
+    if end <= start:
+        raise ValueError(f"bad span {span}")
+    if len(span) == 2:
+        return start, end, 1
+    grade = span[2]
+    if isinstance(grade, bool) or not isinstance(grade, (int, float)) or float(grade) not in GRADES:
+        raise ValueError(f"grade must be 1 or 2, got {span}")
+    return start, end, int(grade)
 
 
 def validate_record(record: dict) -> None:
@@ -19,15 +34,16 @@ def validate_record(record: dict) -> None:
     if not str(record["query"]).strip():
         raise ValueError("query is empty")
     spans = record["relevant_spans"]
-    if not isinstance(spans, list) or not spans:
+    if not isinstance(spans, list):
+        raise ValueError("relevant_spans must be a list")
+    if record["type"] == "negative":
+        if spans:
+            raise ValueError("a negative query has no relevant spans")
+        return
+    if not spans:
         raise ValueError("relevant_spans must be a non-empty list")
     for span in spans:
-        if (
-            not isinstance(span, (list, tuple))
-            or len(span) != 2
-            or float(span[1]) <= float(span[0])
-        ):
-            raise ValueError(f"bad span {span}")
+        parse_span(span)
 
 
 def load_jsonl(path: Path) -> list[dict]:

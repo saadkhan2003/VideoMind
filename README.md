@@ -39,7 +39,7 @@ Speech is transcribed with faster-whisper (`vad_filter=True`, word timestamps). 
 
 ## Retrieval numbers
 
-These cells are empty on purpose. Fill them from `eval/results/` after you label a real dev/test split and run `eval/run_eval.py`. Do not invent them.
+These cells are empty on purpose. Fill them from `eval/results/` after you label a real dev/test split and run `python -m eval.run_eval` (or `python eval/run_eval.py`) from the repo root. Do not invent them.
 
 | Retriever | R@1 | R@5 | R@10 | MRR@10 | nDCG@10 |
 |---|---|---|---|---|---|

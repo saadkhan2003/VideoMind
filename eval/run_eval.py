@@ -1,7 +1,9 @@
 """Run Recall@k, MRR, and nDCG for one retriever configuration.
 
-Example:
+Both of these work from the repo root:
+
   python eval/run_eval.py --queries eval/queries.sample.jsonl --split test --out eval/results/sample
+  python -m eval.run_eval --queries eval/queries.sample.jsonl --split test --out eval/results/sample
 """
 
 from __future__ import annotations
@@ -11,8 +13,12 @@ import json
 import sys
 from pathlib import Path
 
+# `python eval/run_eval.py` puts this file's directory on sys.path[0], so
+# `import eval` looks for eval/eval and raises ModuleNotFoundError. The repo
+# root has to come first. `python -m eval.run_eval` already has the root
+# (the cwd) on the path; inserting it again is harmless.
 ROOT = Path(__file__).resolve().parents[1]
-sys.path[:0] = [str(ROOT / "services"), str(ROOT / "services" / "api")]
+sys.path[:0] = [str(ROOT), str(ROOT / "services"), str(ROOT / "services" / "api")]
 
 from eval.metrics import evaluate, to_markdown  # noqa: E402
 from eval.schema import load_jsonl  # noqa: E402
@@ -75,10 +81,13 @@ def main() -> None:
                 to_markdown(f"VideoMind {name}", report), encoding="utf-8"
             )
             overall = report["overall"]
+            extra = ""
+            if report.get("hard_negatives"):
+                extra = f" hard_negatives={report['hard_negatives']} (not in the averages)"
             print(
                 f"{name}: n={overall['n']} R@1={overall['recall@1']:.3f} "
                 f"R@5={overall['recall@5']:.3f} MRR@10={overall['mrr@10']:.3f} "
-                f"nDCG@10={overall['ndcg@10']:.3f}"
+                f"nDCG@10={overall['ndcg@10']:.3f}{extra}"
             )
     finally:
         resources.close()
