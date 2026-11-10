@@ -1,0 +1,25 @@
+[project]
+name = "videomind"
+version = "0.1.0"
+description = "Multimodal video search: ask a question, get the exact moment."
+requires-python = ">=3.11"
+readme = "README.md"
+
+[tool.pytest.ini_options]
+pythonpath = [".", "services", "services/api"]
+testpaths = ["services/pipeline/tests", "services/api/tests", "eval/tests"]
+markers = [
+  "e2e: end-to-end run with ffmpeg, faster-whisper, and a synthetic clip",
+]
+addopts = "-m 'not e2e'"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+src = ["services", "eval", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["pipeline", "app"]

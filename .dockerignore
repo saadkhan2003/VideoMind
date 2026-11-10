@@ -1,0 +1,12 @@
+.venv
+**/node_modules
+**/.next
+data
+.git
+**/__pycache__
+uploads
+tmp-scaffold
+**/.pytest_cache
+**/.ruff_cache
+*.md
+!README.md

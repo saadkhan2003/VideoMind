@@ -1,0 +1,9 @@
+#cloud-config
+# Optional user-data if you would rather not SSH in to run install-k3s.sh.
+# The k3s token must come from a secret you inject at provision time, not from git.
+package_update: true
+packages:
+  - curl
+  - ca-certificates
+runcmd:
+  - curl -sfL https://get.k3s.io | sh -s - server --write-kubeconfig-mode 644

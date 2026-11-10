@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "videomind.fullname" . }}-config
+  labels:
+    {{- include "videomind.labels" . | nindent 4 }}
+data:
+  WHISPER_MODEL: {{ .Values.config.whisperModel | quote }}
+  CAPTION_BACKEND: {{ .Values.config.captionBackend | quote }}
+  EMBEDDING_BACKEND: {{ .Values.config.embeddingBackend | quote }}
+  EMBEDDING_DIM: {{ .Values.config.embeddingDim | quote }}
+  RERANKER_BACKEND: {{ .Values.config.rerankerBackend | quote }}
+  QDRANT_URL: http://{{ include "videomind.fullname" . }}-qdrant:6333
+  S3_ENDPOINT: {{ .Values.config.s3Endpoint | quote }}
+  S3_BUCKET: {{ .Values.config.s3Bucket | quote }}
+  S3_REGION: {{ .Values.config.s3Region | quote }}
+  WORKER_BACKEND: {{ .Values.worker.backend | quote }}
+  DATA_DIR: /data
+  PUBLIC_BASE_URL: https://{{ .Values.ingress.host }}

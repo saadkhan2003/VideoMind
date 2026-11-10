@@ -1,0 +1,6 @@
+apiVersion: v2
+name: videomind
+description: VideoMind API, web UI, workers, Postgres, and Qdrant on k3s.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

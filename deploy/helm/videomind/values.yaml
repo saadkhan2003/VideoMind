@@ -1,0 +1,92 @@
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  api: ghcr.io/example/videomind-api:latest
+  worker: ghcr.io/example/videomind-worker:latest
+  web: ghcr.io/example/videomind-web:latest
+  pullPolicy: IfNotPresent
+
+api:
+  replicas: 2
+  port: 8000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+web:
+  replicas: 1
+  port: 3000
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+worker:
+  replicas: 1
+  backend: poll
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+
+ingress:
+  enabled: true
+  className: traefik
+  host: videomind.example.com
+  tls: true
+  tlsSecret: videomind-tls
+
+postgres:
+  image: postgres:16-alpine
+  storage: 10Gi
+  user: videomind
+  database: videomind
+  # Set this with --set or a secret file. The chart refuses to ship a real password.
+  password: change-me
+
+qdrant:
+  image: qdrant/qdrant:v1.13.4
+  storage: 20Gi
+
+config:
+  whisperModel: tiny
+  captionBackend: mock
+  embeddingBackend: hash
+  embeddingDim: "384"
+  rerankerBackend: lexical
+  s3Endpoint: ""
+  s3Bucket: videomind
+  s3Region: auto
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+
+serviceMonitor:
+  enabled: false
+
+ray:
+  enabled: false
+  workerReplicas: 1
+
+keda:
+  enabled: false
+  queueLength: "5"
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001

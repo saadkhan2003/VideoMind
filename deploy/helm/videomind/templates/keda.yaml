@@ -1,0 +1,18 @@
+{{- if .Values.keda.enabled }}
+# Requires KEDA. Scales the poll/Celery worker deployment from Redis list length.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ include "videomind.fullname" . }}-worker
+spec:
+  scaleTargetRef:
+    name: {{ include "videomind.fullname" . }}-worker
+  minReplicaCount: 1
+  maxReplicaCount: 8
+  triggers:
+    - type: redis
+      metadata:
+        address: redis:6379
+        listName: videomind
+        listLength: {{ .Values.keda.queueLength | quote }}
+{{- end }}

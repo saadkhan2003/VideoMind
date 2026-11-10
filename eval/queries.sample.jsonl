@@ -1,0 +1,4 @@
+{"query_id": "q1", "query": "where does the lecture explain backpropagation", "type": "spoken", "video_id": "sample-lecture", "relevant_spans": [[8, 16]], "split": "test"}
+{"query_id": "q2", "query": "when is the architecture diagram shown", "type": "visual", "video_id": "sample-lecture", "relevant_spans": [[16, 24]], "split": "test"}
+{"query_id": "q3", "query": "mean squared error", "type": "keyword", "video_id": "sample-lecture", "relevant_spans": [[24, 32]], "split": "dev"}
+{"query_id": "q4", "query": "neural networks introduction", "type": "spoken", "video_id": "sample-lecture", "relevant_spans": [[0, 8]], "split": "dev"}

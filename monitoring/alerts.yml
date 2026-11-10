@@ -1,0 +1,19 @@
+groups:
+  - name: videomind
+    rules:
+      - alert: VideoMindJobFailures
+        expr: increase(videomind_job_failures_total[15m]) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: VideoMind jobs are failing
+          description: More than two ingestion jobs failed in 15 minutes.
+      - alert: VideoMindSearchP95High
+        expr: histogram_quantile(0.95, sum by (le) (rate(videomind_search_stage_duration_seconds_bucket{stage="total"}[5m]))) > 0.3
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Search p95 is above 300ms
+          description: The total search stage p95 has stayed above 300ms for 10 minutes.
