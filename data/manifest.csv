@@ -1,2 +1,5 @@
 video_id,title,source_url,license,duration_s,notes
-sample-lecture,Neural networks (synthetic sample),,CC0-synthetic,32,Generated with ffmpeg and espeak-ng for local tests. Not a published lecture. Replace this row when you add videos you have the right to use.
+sample-lecture,Neural networks (synthetic sample),,CC0-synthetic,32,Generated with ffmpeg and espeak-ng for local tests. Not a published lecture.
+edison-1920s,"Edison speech, 1920s",https://commons.wikimedia.org/wiki/File:Edison_speech,_1920s.ogv,Public domain,130,Wikimedia Commons. Downloaded by scripts/cloud_ingest.py. Not stored in git.
+hufsky-data-retention,Demonstration data retention speech Hufsky 1 (2007),https://commons.wikimedia.org/wiki/File:Demonstration_data_retention_at_BMVIT_speech_Hufsky_1_2007-06-07.ogv,CC BY-SA 3.0,30,Wikimedia Commons. Credit the author on the file page. Tiny Whisper did not produce a usable English transcript on a local listen; no eval span is committed for this clip.
+talking-tree-2011,Talking tree 2011,https://commons.wikimedia.org/wiki/File:Talking_tree_2011.webm,CC BY 2.0,47,Wikimedia Commons. Credit the author on the file page.

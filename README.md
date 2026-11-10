@@ -68,6 +68,8 @@ make web          # http://127.0.0.1:43123
 
 Open the UI, search for a word from the sample lecture (for example `backpropagation` or `architecture`), and press **Play this moment**. The player seeks to `start_s`.
 
+The paid cloud path (OpenRouter, Qdrant Cloud on port 443, Cloudflare R2 bucket `videomind-media`, Langfuse Cloud) is in [CLOUD_RUN.md](CLOUD_RUN.md). Keys stay in the environment. Caption calls stop at `--max-usd` (default $0.15) using the cost OpenRouter reports.
+
 `make test` runs the unit and integration tests. `make e2e` rebuilds the synthetic clip and runs faster-whisper tiny on CPU.
 
 Docker Compose (Postgres, Redis, Qdrant, MinIO, API, worker, web, Prometheus, Grafana) is in `deploy/docker-compose.yml`. `make up` was not executed here because this environment has no Docker daemon. Local MinIO and Postgres passwords in that file are for a laptop only.

@@ -84,19 +84,29 @@ class LocalStore:
 class S3Store:
     backend = "s3"
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        endpoint: str,
+        bucket: str,
+        access_key: str,
+        secret_key: str,
+        region: str = "auto",
+        use_ssl: bool = True,
+    ) -> None:
         import boto3
         from botocore.config import Config
 
         self.settings = settings
-        self.bucket = settings.s3_bucket
+        self.bucket = bucket
         self.client = boto3.client(
             "s3",
-            endpoint_url=settings.s3_endpoint or None,
-            aws_access_key_id=settings.s3_access_key or None,
-            aws_secret_access_key=settings.s3_secret_key or None,
-            region_name=settings.s3_region or "auto",
-            use_ssl=settings.s3_use_ssl,
+            endpoint_url=endpoint or None,
+            aws_access_key_id=access_key or None,
+            aws_secret_access_key=secret_key or None,
+            region_name=region or "auto",
+            use_ssl=use_ssl,
             config=Config(signature_version="s3v4", s3={"addressing_style": "path"}),
         )
 
@@ -143,7 +153,32 @@ class S3Store:
             return {"backend": "s3", "ok": False, "bucket": self.bucket, "error": str(exc)}
 
 
-def build_store(settings: Settings) -> LocalStore | S3Store:
+def object_storage_target(settings: Settings) -> dict | None:
+    """Resolve R2 first, then generic S3/MinIO. None means the local disk."""
+    if settings.r2_account_id and settings.r2_access_key_id and settings.r2_secret_access_key:
+        account = settings.r2_account_id.strip()
+        return {
+            "endpoint": f"https://{account}.r2.cloudflarestorage.com",
+            "bucket": settings.r2_bucket or "videomind-media",
+            "access_key": settings.r2_access_key_id,
+            "secret_key": settings.r2_secret_access_key,
+            "region": "auto",
+            "use_ssl": True,
+        }
     if settings.s3_endpoint or settings.s3_access_key:
-        return S3Store(settings)
+        return {
+            "endpoint": settings.s3_endpoint,
+            "bucket": settings.s3_bucket,
+            "access_key": settings.s3_access_key,
+            "secret_key": settings.s3_secret_key,
+            "region": settings.s3_region or "auto",
+            "use_ssl": settings.s3_use_ssl,
+        }
+    return None
+
+
+def build_store(settings: Settings) -> LocalStore | S3Store:
+    target = object_storage_target(settings)
+    if target:
+        return S3Store(settings, **target)
     return LocalStore(Path(settings.data_dir) / "objects", settings)

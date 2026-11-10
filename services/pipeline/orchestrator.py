@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from pipeline.asr import transcribe_file
+from pipeline.budget import UsdBudget
 from pipeline.captions import CachingCaptioner, build_captioner, caption_keyframes
 from pipeline.chunker import attach_visuals, chunk_transcript
 from pipeline.config import Settings
@@ -139,7 +140,12 @@ def run_pipeline(
                     frame.caption_backend = result.backend
                     frame.caption_model = result.model
                 return frames
-            captioner = CachingCaptioner(build_captioner(settings), settings, tracer)
+            budget = None
+            if settings.caption_backend == "openrouter":
+                budget = UsdBudget(settings.caption_budget_usd)
+            captioner = CachingCaptioner(
+                build_captioner(settings), settings, tracer, budget=budget
+            )
             return caption_keyframes(frames, captioner)
 
         frames = _stage(repo, job["id"], "captions", settings, do_captions)

@@ -7,7 +7,9 @@ import logging
 import time
 from pathlib import Path
 
+from pipeline.budget import BudgetExceeded, UsdBudget
 from pipeline.config import Settings
+from pipeline.openrouter_models import resolve_vlm_model, usage_cost_usd
 from pipeline.tracing import Tracer
 from pipeline.types import Keyframe
 
@@ -80,11 +82,20 @@ class TesseractCaptioner:
 
 
 class OpenAICompatibleCaptioner:
-    def __init__(self, *, backend: str, model: str, base_url: str, api_key: str) -> None:
+    def __init__(
+        self,
+        *,
+        backend: str,
+        model: str,
+        base_url: str,
+        api_key: str,
+        pricing: dict | None = None,
+    ) -> None:
         self.backend = backend
         self.model = model
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
+        self.pricing = pricing
 
     def caption(self, image_path: str, timestamp: float) -> Caption:
         del timestamp
@@ -127,7 +138,10 @@ class OpenAICompatibleCaptioner:
             )
         description, visible = _parse_caption_json(str(content))
         usage = body.get("usage") or {}
-        cost = float(usage.get("cost") or 0.0)
+        if self.backend == "openrouter":
+            cost = usage_cost_usd(usage, self.pricing)
+        else:
+            cost = float(usage.get("cost") or 0.0)
         return Caption(description, visible, self.backend, self.model, cost)
 
 
@@ -153,11 +167,13 @@ def build_captioner(settings: Settings):
     if backend == "openrouter":
         if not settings.openrouter_api_key:
             raise RuntimeError("OPENROUTER_API_KEY is required for caption_backend=openrouter")
+        model, pricing = resolve_vlm_model(settings.openrouter_base_url, settings.openrouter_vlm_model)
         return OpenAICompatibleCaptioner(
             backend="openrouter",
-            model=settings.openrouter_vlm_model,
+            model=model,
             base_url=settings.openrouter_base_url,
             api_key=settings.openrouter_api_key,
+            pricing=pricing,
         )
     if backend == "vllm":
         return OpenAICompatibleCaptioner(
@@ -170,9 +186,10 @@ def build_captioner(settings: Settings):
 
 
 class CachingCaptioner:
-    def __init__(self, inner, settings: Settings, tracer: Tracer) -> None:
+    def __init__(self, inner, settings: Settings, tracer: Tracer, budget: UsdBudget | None = None) -> None:
         self.inner = inner
         self.tracer = tracer
+        self.budget = budget
         self.path = Path(settings.data_dir) / "caption_cache.json"
         self.path.parent.mkdir(parents=True, exist_ok=True)
         if self.path.exists():
@@ -204,7 +221,11 @@ class CachingCaptioner:
                 metadata={"backend": caption.backend},
             )
             return caption, True, digest
+        if self.budget is not None:
+            self.budget.ensure_open()
         caption = self.inner.caption(image_path, timestamp)
+        if self.budget is not None:
+            self.budget.note(caption.cost_usd)
         latency = time.perf_counter() - started
         self.cache[cache_key] = {
             "description": caption.description,
@@ -230,7 +251,11 @@ def caption_keyframes(frames: list[Keyframe], captioner: CachingCaptioner) -> li
     hits = 0
     cost = 0.0
     for frame in frames:
-        caption, cache_hit, _digest = captioner.caption(frame.image_path, frame.time)
+        try:
+            caption, cache_hit, _digest = captioner.caption(frame.image_path, frame.time)
+        except BudgetExceeded as exc:
+            log.warning("%s", exc)
+            break
         frame.caption = caption.description
         frame.ocr_text = caption.ocr_text
         frame.caption_backend = caption.backend

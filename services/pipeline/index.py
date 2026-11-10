@@ -4,6 +4,7 @@ import logging
 import threading
 import uuid
 from typing import Any
+from urllib.parse import urlparse
 
 from qdrant_client import QdrantClient, models
 
@@ -13,9 +14,27 @@ log = logging.getLogger("videomind.index")
 _lock = threading.Lock()
 
 
+def qdrant_client_kwargs(settings: Settings) -> dict:
+    """REST kwargs for a Qdrant URL.
+
+    Qdrant Cloud serves HTTPS on port 443. The client defaults to 6333 when the
+    URL has no explicit port, which misses a cloud cluster.
+    """
+    parsed = urlparse(settings.qdrant_url)
+    kwargs: dict = {
+        "url": settings.qdrant_url,
+        "api_key": settings.qdrant_api_key or None,
+        "prefer_grpc": False,
+        "timeout": 60,
+    }
+    if parsed.scheme == "https" and parsed.port is None:
+        kwargs["port"] = 443
+    return kwargs
+
+
 def build_qdrant(settings: Settings) -> QdrantClient:
     if settings.qdrant_url:
-        return QdrantClient(url=settings.qdrant_url, api_key=settings.qdrant_api_key or None)
+        return QdrantClient(**qdrant_client_kwargs(settings))
     if settings.qdrant_path == ":memory:":
         return QdrantClient(":memory:")
     from pathlib import Path

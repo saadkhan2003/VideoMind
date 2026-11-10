@@ -1,0 +1,4 @@
+{"query_id": "edison-experiment", "query": "experiment", "type": "keyword", "video_id": "edison-1920s", "relevant_spans": [[6.2, 9.8]], "split": "test"}
+{"query_id": "edison-memorandum", "query": "memorandum were drawn up", "type": "spoken", "video_id": "edison-1920s", "relevant_spans": [[11.1, 15.3]], "split": "test"}
+{"query_id": "tree-christmas", "query": "Christmas is coming", "type": "spoken", "video_id": "talking-tree-2011", "relevant_spans": [[0.2, 5.2]], "split": "test"}
+{"query_id": "tree-parks", "query": "trees in the royal parks", "type": "spoken", "video_id": "talking-tree-2011", "relevant_spans": [[9.4, 14.5]], "split": "dev"}

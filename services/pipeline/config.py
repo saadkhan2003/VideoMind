@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     s3_secret_key: str = ""
     s3_region: str = "auto"
     s3_use_ssl: bool = False
+    # Cloudflare R2. When all three credentials are set, they win over S3_*.
+    r2_account_id: str = ""
+    r2_access_key_id: str = ""
+    r2_secret_access_key: str = ""
+    r2_bucket: str = "videomind-media"
     data_dir: str = "./data"
 
     whisper_model: str = "tiny"
@@ -29,7 +34,9 @@ class Settings(BaseSettings):
     caption_backend: str = "mock"
     openrouter_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
-    openrouter_vlm_model: str = "qwen/qwen2.5-vl-7b-instruct"
+    # "auto" asks OpenRouter's public model list for the cheapest capable vision model.
+    openrouter_vlm_model: str = "auto"
+    caption_budget_usd: float = 0.15
     openrouter_answer_model: str = "openai/gpt-4o-mini"
     vllm_base_url: str = "http://127.0.0.1:8001/v1"
     vllm_model: str = "Qwen/Qwen2.5-VL-3B-Instruct"
