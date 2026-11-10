@@ -42,7 +42,8 @@ worker:
 
 ingress:
   enabled: true
-  className: traefik
+  # install-k3s.sh disables Traefik and the runbook installs ingress-nginx.
+  className: nginx
   host: videomind.example.com
   tls: true
   tlsSecret: videomind-tls

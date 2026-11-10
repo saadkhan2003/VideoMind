@@ -1,4 +1,4 @@
-.PHONY: up down test e2e lint api web ingest-sample helm-lint tf-validate
+.PHONY: up down test e2e lint api web ingest-sample demo helm-lint tf-validate
 
 PYTHON ?= .venv/bin/python
 PYTEST ?= .venv/bin/pytest
@@ -27,6 +27,9 @@ web:
 
 ingest-sample:
 	PYTHONPATH=services $(PYTHON) scripts/ingest_sample.py
+
+demo:
+	./scripts/demo.sh
 
 helm-lint:
 	helm lint deploy/helm/videomind

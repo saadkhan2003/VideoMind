@@ -110,7 +110,7 @@ spec:
 EOF
 ```
 
-If you used k3s's bundled Traefik instead of disabling it, set `ingress.className=traefik` and point the solver at Traefik. The install script disables Traefik; the chart's default class name is `traefik`, so either change the value to `nginx` or leave Traefik on. Pick one and match the chart.
+The install script disables Traefik and the chart's default ingress class is `nginx`, which matches the ingress-nginx install above. If you leave Traefik on instead, set `ingress.className=traefik`.
 
 Copy kubeconfig to your laptop and store it for Actions:
 

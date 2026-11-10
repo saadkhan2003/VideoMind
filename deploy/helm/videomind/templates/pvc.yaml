@@ -5,6 +5,8 @@ metadata:
   labels:
     {{- include "videomind.labels" . | nindent 4 }}
 spec:
+  # One node. ReadWriteOnce is mounted by the API and the worker on that node.
+  # Move media to S3 or R2 before scheduling pods on a second node.
   accessModes:
     - ReadWriteOnce
   resources:

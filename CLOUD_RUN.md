@@ -44,7 +44,11 @@ Rerun the labeller against your own transcript and segment rows before you treat
   --out eval/queries.cloud.jsonl
 ```
 
-`--transcripts` reads `$DATA_DIR/objects/videos/<id>/transcript.json` when the object is on local disk. `--from-store` reads the same key from R2 when the R2 variables are set. `--db` is the sqlite file from `DATABASE_URL` (default `./data/videomind.db`) and supplies `visual_caption` and `ocr_text`. If a caption contains the phrase, that segment replaces the frame fallback. If it does not, the helper keeps the frame times and prints a warning. A spoken spec with `on_miss: skip` (the Hufsky speech query) is added only when the transcript actually contains the phrase. Do not copy the scores into the README table until you have looked at them.
+`--transcripts` reads `$DATA_DIR/objects/videos/<id>/transcript.json` when the object is on local disk. `--from-store` reads the same key from R2 when the R2 variables are set. `--db` is the sqlite file from `DATABASE_URL` (default `./data/videomind.db`) and supplies `visual_caption` and `ocr_text`. If a caption contains the phrase, that segment replaces the frame fallback. If it does not, the helper keeps the frame times and prints a warning.
+
+A spoken phrase that is not in the transcript does not abort the run. The helper warns and keeps the fallback spans or the spans already in `--out`. `--strict` exits on that miss (the old behaviour). A spec line with `on_miss: skip` (the Hufsky speech query) is added only when the transcript actually contains the phrase. `tree-talk` is the phrase `talk and sing` (16.14–17.56s on the cloud tiny-whisper pass).
+
+The 10 Nov 2026 test-split numbers are in the README. They were computed on the committed query file before this phrase fix, so a later eval can move `tree-talk` if you realign first.
 
 ## Commands
 

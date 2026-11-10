@@ -39,19 +39,23 @@ Speech is transcribed with faster-whisper (`vad_filter=True`, word timestamps). 
 
 ## Retrieval numbers
 
-These cells are empty on purpose. Fill them from `eval/results/` after you label a real dev/test split and run `python -m eval.run_eval` (or `python eval/run_eval.py`) from the repo root. Do not invent them.
+Measured, 3 clips, 21 queries, Nov 10 2026. Test split of `eval/queries.cloud.jsonl` (30 rows: 24 test, 6 dev). The three test hard negatives are excluded, which is why `n=21`. Embeddings were the default hashing embedder, not BGE. The reranker was the lexical overlap scorer, not `bge-reranker-v2-m3`. Printed by `eval/run_eval.py` after the Hufsky end frame had been reindexed.
 
-| Retriever | R@1 | R@5 | R@10 | MRR@10 | nDCG@10 |
-|---|---|---|---|---|---|
-| BM25 (sparse) only | [X] | [X] | [X] | [X] | [X] |
-| Transcript dense only | [X] | [X] | [X] | [X] | [X] |
-| + visual captions | [X] | [X] | [X] | [X] | [X] |
-| Hybrid (RRF, all three) | [X] | [X] | [X] | [X] | [X] |
-| Hybrid + reranker | [X] | [X] | [X] | [X] | [X] |
+| Retriever | R@1 | R@5 | MRR@10 | nDCG@10 |
+|---|---|---|---|---|
+| BM25 (sparse) only | 0.857 | 1.000 | 0.913 | 0.924 |
+| Transcript dense only | 0.667 | 0.952 | 0.816 | 0.851 |
+| Text + visual dense | 0.571 | 1.000 | 0.760 | 0.808 |
+| Hybrid (RRF, all three) | 0.810 | 1.000 | 0.897 | 0.895 |
+| Hybrid + reranker | 0.714 | 1.000 | 0.837 | 0.867 |
 
-Break the same table down by query type (`spoken`, `visual`, `keyword`). Visual queries are where captions should move the number. Latency (search p50/p95 for retrieve, rerank, and answer) and cost per video-hour are also `[X]` until you measure them. A Locust run is not included.
+Recall@10 was computed by the runner and was not in the printed summary, so it is not in this table. The same is true of a per-type breakdown and of search latency. No Locust run.
 
-The hit rule, the dev/test split, and the JSONL shape are in [eval/README.md](eval/README.md). `eval/queries.sample.jsonl` has four queries for the synthetic clip. It is a format example, not a 150-query set.
+On these short clips the useful tokens are rare ("experiment", "Christmas is coming", "talk and sing", the banner words), so sparse ranking beats the hashing embedder. That is not a result about BGE. Adding the visual vector lowers Recall@1: most of the 21 queries are spoken or keyword, and a caption does not carry the spoken phrase. Visual-only search is last, at 0.571. The lexical reranker hurts at this scale. It reorders a handful of windows and drops hybrid Recall@1 from 0.810 to 0.714. Recall@5 is 1.000 for four retrievers and 0.952 for transcript dense, so the right window is almost always in the top five when it is not first.
+
+Caption cost was **$0.0020 total across both runs**, model `qwen/qwen3.7-flash`: $0.00177940 for the first 13 captions, then $0.00024852 for the one new Hufsky frame at 29.85s (the 15.05s frame was a cache hit at $0). The `--max-usd` cap on each run was $0.15.
+
+The hit rule, the dev/test split, and the JSONL shape are in [eval/README.md](eval/README.md). `eval/queries.sample.jsonl` has four queries for the synthetic clip. It is a format example. The cloud file is the measured set.
 
 ## Run locally
 
@@ -67,6 +71,8 @@ make web          # http://127.0.0.1:43123
 ```
 
 Open the UI, search for a word from the sample lecture (for example `backpropagation` or `architecture`), and press **Play this moment**. The player seeks to `start_s`.
+
+`./scripts/demo.sh` is that same CPU path in one command: synthetic clip, index, three searches. It forces Tesseract, the hash embedder, and the local database so a `.env` full of cloud keys is not used and nothing is billed.
 
 The paid cloud path (OpenRouter, Qdrant Cloud on port 443, Cloudflare R2 bucket `videomind-media`, Langfuse Cloud) is in [CLOUD_RUN.md](CLOUD_RUN.md). Keys stay in the environment. Caption calls stop at `--max-usd` (default $0.15) using the cost OpenRouter reports.
 
@@ -91,7 +97,7 @@ flowchart LR
   Helm --> K3s
 ```
 
-`deploy/terraform` can plan a Hetzner VM, a firewall, a Cloudflare DNS record, and an R2 bucket. Every paid resource is behind a flag that defaults to false, so `terraform validate` does not create anything. `deploy/k8s/install-k3s.sh` installs k3s. `deploy/helm/videomind` is the chart (`helm lint` passes): API, web, poll worker, Postgres, Qdrant, an Ingress, an HPA, and optional ServiceMonitor, KubeRay, and KEDA manifests that stay off until you enable them.
+`deploy/terraform` can plan a Hetzner VM, a firewall, a Cloudflare DNS record, and an R2 bucket. Every paid resource is behind a flag that defaults to false, so `terraform validate` does not create anything. `deploy/k8s/install-k3s.sh` installs k3s. `deploy/helm/videomind` is the chart (`helm lint` passes): API, web, poll worker, Postgres, Qdrant, an Ingress (class `nginx`, matching `deploy/k8s/install-k3s.sh`, which turns Traefik off), an HPA, and optional ServiceMonitor, KubeRay, and KEDA manifests that stay off until you enable them. The shared data volume is ReadWriteOnce, so this chart is for one node until media moves to S3 or R2.
 
 GitHub Actions (`.github/workflows/ci.yml`) lints, runs the unit tests and the short end-to-end test, builds the UI, lints the chart, and validates Terraform. `deploy.yml` pushes images to GHCR and runs `helm upgrade` when `KUBECONFIG_B64` is set. Roll back with `helm rollback videomind`.
 
@@ -119,7 +125,7 @@ Screenshots belong in the demo video you record. None are checked in, so this RE
 - The lexical reranker is not `bge-reranker-v2-m3`. The cross-encoder class is the production path and is unit-tested with a fake model. Downloading the weights is your step.
 - Ray and Celery are implemented and import cleanly. They were not run as a cluster here. The verified worker is the in-process pipeline, with retries per stage.
 - Long videos are rejected at `MAX_VIDEO_SECONDS` (default 4 hours) and `MAX_UPLOAD_BYTES` (default 2 GiB). That is a guard, not a scaling story.
-- The labeled set is four sample queries. Recall on that file would mostly measure the synthetic clip, so it is not reported above.
+- The measured table above is 21 scored queries on three short clips with a hashing embedder and a lexical reranker. It is not a BGE or cross-encoder result, and it is not a 150-query set.
 
 ## Video sources
 

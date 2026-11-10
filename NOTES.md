@@ -31,7 +31,9 @@ The pipeline function is the same for every backend. Inline mode runs it on a th
 - `npm run build` for the Next.js app.
 - `helm lint` and `terraform validate` (providers downloaded, no apply).
 
-Docker Compose was not started. No OpenRouter call was made. No GPU, no k3s cluster, no R2 bucket.
+Docker Compose was not started in the build environment. No GPU and no k3s cluster were used here.
+
+A later run on another machine, with keys, measured the three-clip test split on 10 Nov 2026. Those numbers are in the README. Caption spend across both cloud runs was $0.0020 on `qwen/qwen3.7-flash`. The dense vectors in that table are the hashing embedder. The Hetzner VM and the k3s install are still yours to do.
 
 ## Interview prompts
 

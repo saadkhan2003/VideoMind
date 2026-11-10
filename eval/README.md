@@ -43,4 +43,4 @@ python -m eval.align_labels \
   --out eval/queries.cloud.jsonl
 ```
 
-`align_labels` reads transcript JSON and segment rows you already stored. It does not call OpenRouter. See `CLOUD_RUN.md` for the cloud paths. The runner prints Recall@1/5/10, MRR@10, and nDCG@10 overall and by query type. Do not paste a sample-clip run into the README table.
+`align_labels` reads transcript JSON and segment rows you already stored. It does not call OpenRouter. A missing phrase warns and keeps the previous spans. `--strict` exits instead. See `CLOUD_RUN.md` for the cloud paths. The runner prints Recall@1/5/10, MRR@10, and nDCG@10 overall and by query type. The README table is the 10 Nov 2026 measurement. Do not paste a sample-clip run over it.

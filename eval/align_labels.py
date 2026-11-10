@@ -6,6 +6,11 @@ the phrase. Visual queries prefer a segment whose caption or OCR text contains
 the phrase. If the caption text does not, the frame times in the spec are kept
 and a warning is printed.
 
+A spoken phrase that is missing does not abort the file. The default warns and
+keeps fallback spans or the spans already in ``--out``. ``--strict`` exits
+instead, which is the previous behaviour. A spec line with ``on_miss: skip``
+still drops that one query. ``on_miss: error`` still aborts.
+
 This does not call OpenRouter or any other paid API. Point it at files you
 already have, or at the object store already configured in the environment.
 
@@ -163,8 +168,15 @@ def align_query(
     *,
     transcripts: dict[str, dict],
     segments: list[dict],
+    existing: dict | None = None,
+    strict: bool = False,
 ) -> tuple[dict | None, str]:
-    """Return ``(record, warning)``. ``record`` is None when the spec says to skip a miss."""
+    """Return ``(record, warning)``. ``record`` is None when the query is left out.
+
+    A phrase miss warns and keeps a fallback span or the spans already in the
+    output file. ``--strict`` (or ``on_miss: error``) is the old abort.
+    ``on_miss: skip`` leaves the query out without aborting.
+    """
     video_id = spec["video_id"]
     query_type = spec["type"]
     if query_type == "negative":
@@ -176,7 +188,7 @@ def align_query(
     phrases = list(spec.get("phrases") or [])
     grade = int(spec.get("grade") or 2)
     demote = bool(spec.get("demote_repeats"))
-    on_miss = spec.get("on_miss") or "error"
+    on_miss = _miss_mode(spec, strict=strict)
 
     if query_type in {"spoken", "keyword"}:
         document = transcripts.get(video_id)
@@ -200,11 +212,11 @@ def align_query(
                 record["label_source"] = "segment-text"
                 record["matched_phrase"] = phrase
                 return record, ""
-        if on_miss == "skip":
-            return None, f"skipped {spec['query_id']}: none of {phrases} is in the transcript"
-        raise SystemExit(
-            f"{spec['query_id']}: none of {phrases} was found for {video_id}. "
-            "Pass a transcript directory, --db, or --from-store, or set on_miss to skip."
+        return _on_miss(
+            spec,
+            on_miss,
+            existing,
+            f"none of {phrases} was found for {video_id}",
         )
 
     fallback = [list(span) for span in spec.get("fallback_spans") or []]
@@ -231,9 +243,40 @@ def align_query(
                 "kept the frame times from the spec"
             )
         return record, warning
-    if on_miss == "skip":
-        return None, f"skipped {spec['query_id']}: no caption match and no frame span"
-    raise SystemExit(f"{spec['query_id']}: visual query has no fallback_spans and no caption match")
+    return _on_miss(spec, on_miss, existing, "visual query has no fallback_spans and no caption match")
+
+
+def _miss_mode(spec: dict, *, strict: bool) -> str:
+    explicit = spec.get("on_miss")
+    if explicit:
+        return str(explicit)
+    return "error" if strict else "keep"
+
+
+def _on_miss(spec: dict, mode: str, existing: dict | None, reason: str) -> tuple[dict | None, str]:
+    query_id = spec["query_id"]
+    if mode == "skip":
+        return None, f"skipped {query_id}: {reason}"
+    if mode == "error":
+        raise SystemExit(
+            f"{query_id}: {reason}. "
+            "Re-run without --strict to warn and keep the previous spans, or set on_miss to skip."
+        )
+    fallback = [list(span) for span in spec.get("fallback_spans") or []]
+    if fallback:
+        record = _base_record(spec, fallback)
+        record["label_source"] = "kept-fallback"
+        return record, f"{query_id}: {reason}; kept the fallback spans"
+    spans = (existing or {}).get("relevant_spans") or []
+    if spans:
+        record = _base_record(spec, spans)
+        if existing and existing.get("label_source"):
+            record["label_source"] = existing["label_source"]
+        if existing and existing.get("matched_phrase"):
+            record["matched_phrase"] = existing["matched_phrase"]
+        record["kept_previous"] = True
+        return record, f"{query_id}: {reason}; kept the spans already in the output file"
+    return None, f"{query_id}: {reason}; nothing to keep, so this query was left out of the output"
 
 
 def _base_record(spec: dict, spans: list) -> dict:
@@ -250,11 +293,25 @@ def _base_record(spec: dict, spans: list) -> dict:
     return record
 
 
-def align_all(specs: list[dict], *, transcripts: dict[str, dict], segments: list[dict]) -> tuple[list[dict], list[str]]:
+def align_all(
+    specs: list[dict],
+    *,
+    transcripts: dict[str, dict],
+    segments: list[dict],
+    existing: dict[str, dict] | None = None,
+    strict: bool = False,
+) -> tuple[list[dict], list[str]]:
     records = []
     warnings = []
+    previous = existing or {}
     for spec in specs:
-        record, warning = align_query(spec, transcripts=transcripts, segments=segments)
+        record, warning = align_query(
+            spec,
+            transcripts=transcripts,
+            segments=segments,
+            existing=previous.get(spec["query_id"]),
+            strict=strict,
+        )
         if warning:
             warnings.append(warning)
         if record is not None:
@@ -332,6 +389,24 @@ def load_transcripts_from_store(video_ids: list[str]) -> dict[str, dict]:
     return found
 
 
+def load_existing(path: Path) -> dict[str, dict]:
+    """Rows already in ``--out``. A miss keeps these spans instead of aborting."""
+    if not path.is_file():
+        return {}
+    found: dict[str, dict] = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        query_id = row.get("query_id")
+        if query_id:
+            found[str(query_id)] = row
+    return found
+
+
 def write_jsonl(path: Path, records: list[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     text = "".join(json.dumps(record, ensure_ascii=False) + "\n" for record in records)
@@ -350,6 +425,14 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="Read videos/<id>/transcript.json from the configured object store (R2 or local disk)",
     )
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help=(
+            "Exit if a phrase is missing and the spec does not set on_miss. "
+            "The default warns and keeps fallback or previous spans."
+        ),
+    )
     args = parser.parse_args(argv)
     specs = load_specs(args.spec)
     video_ids = sorted({spec["video_id"] for spec in specs})
@@ -364,7 +447,13 @@ def main(argv: list[str] | None = None) -> None:
         segments.extend(load_segments_db(args.db))
     if args.captions:
         segments.extend(load_caption_jsonl(args.captions))
-    records, warnings = align_all(specs, transcripts=transcripts, segments=segments)
+    records, warnings = align_all(
+        specs,
+        transcripts=transcripts,
+        segments=segments,
+        existing=load_existing(args.out),
+        strict=args.strict,
+    )
     for warning in warnings:
         print(f"warning: {warning}")
     write_jsonl(args.out, records)
