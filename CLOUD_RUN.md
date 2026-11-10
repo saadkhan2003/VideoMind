@@ -98,11 +98,11 @@ Optional: include the `dev` queries as well.
 .venv/bin/python -m eval.run_eval \
   --queries eval/queries.cloud.jsonl \
   --split all \
-  --ablation hybrid_rerank \
+  --ablation hybrid \
   --out eval/results/cloud
 ```
 
-The printed `n` is the scored queries. The line also reports `hard_negatives`, which are not in the averages.
+The printed `n` is the scored queries. The line also reports `hard_negatives`, which are not in the averages. The default ablation is `hybrid` (no reranker). Pass `--ablation hybrid_rerank` only when you want that comparison. `RERANKER_ENABLED` defaults to false for the same reason.
 
 ## Rerun when the three clips are already indexed
 

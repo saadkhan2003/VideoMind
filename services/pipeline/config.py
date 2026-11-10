@@ -46,7 +46,10 @@ class Settings(BaseSettings):
     embedding_model: str = "BAAI/bge-m3"
     embedding_dim: int = 384
 
-    reranker_enabled: bool = True
+    # Off by default. On the 10 Nov 2026 short-clip BGE run the cross-encoder
+    # lowered hybrid Recall@1 and about doubled CPU latency. Turn it on for a
+    # longer corpus after you measure it.
+    reranker_enabled: bool = False
     reranker_backend: str = "lexical"
     reranker_model: str = "BAAI/bge-reranker-v2-m3"
     rerank_candidates: int = 50

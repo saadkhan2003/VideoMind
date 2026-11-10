@@ -41,7 +41,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate VideoMind retrieval")
     parser.add_argument("--queries", type=Path, default=Path("eval/queries.sample.jsonl"))
     parser.add_argument("--split", default="test", choices=["dev", "test", "all"])
-    parser.add_argument("--ablation", default="hybrid_rerank", choices=[*ABLATIONS, "all"])
+    parser.add_argument("--ablation", default="hybrid", choices=[*ABLATIONS, "all"])
     parser.add_argument("--k", type=int, default=10)
     parser.add_argument("--out", type=Path, default=Path("eval/results/sample"))
     args = parser.parse_args()

@@ -9,6 +9,7 @@ data:
   CAPTION_BACKEND: {{ .Values.config.captionBackend | quote }}
   EMBEDDING_BACKEND: {{ .Values.config.embeddingBackend | quote }}
   EMBEDDING_DIM: {{ .Values.config.embeddingDim | quote }}
+  RERANKER_ENABLED: {{ .Values.config.rerankerEnabled | quote }}
   RERANKER_BACKEND: {{ .Values.config.rerankerBackend | quote }}
   QDRANT_URL: http://{{ include "videomind.fullname" . }}-qdrant:6333
   S3_ENDPOINT: {{ .Values.config.s3Endpoint | quote }}

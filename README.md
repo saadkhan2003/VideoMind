@@ -35,25 +35,40 @@ flowchart TB
 
 A segment is one searchable window: `video_id`, `start_s`, `end_s`, transcript, visual caption, OCR text, and a keyframe. The default window is about 45 seconds with about 10 seconds of overlap, snapped to Whisper sentence boundaries. The 32-second sample clip uses 8-second windows so each slide can be its own hit.
 
-Speech is transcribed with faster-whisper (`vad_filter=True`, word timestamps). PySceneDetect's adaptive detector picks frames where the picture changes, and a frame is also kept at least every 30 seconds before a perceptual-hash check drops a frame that matches the previous one. Captions go through one interface with four backends: OpenRouter, a self-hosted Qwen2.5-VL on vLLM, Tesseract (CPU, no key), or a mock used by the tests. Results are cached by image hash. Dense vectors default to a hashing embedder so the project runs without downloading BGE; set `EMBEDDING_BACKEND=sentence_transformers` and `EMBEDDING_MODEL=BAAI/bge-m3` when you are ready to download it (`EMBEDDING_DIM=1024`, new collection). Sparse vectors are term frequencies on a stable token hash, with Qdrant's IDF modifier. Hybrid search prefetches `text_dense`, `visual_dense`, and `sparse` and fuses them with reciprocal rank fusion. The reranker is `sentence_transformers.CrossEncoder` on `BAAI/bge-reranker-v2-m3` when `RERANKER_BACKEND=cross_encoder`; otherwise a lexical overlap scorer runs so tests and CPU demos do not download the weights.
+Speech is transcribed with faster-whisper (`vad_filter=True`, word timestamps). PySceneDetect's adaptive detector picks frames where the picture changes, and a frame is also kept at least every 30 seconds before a perceptual-hash check drops a frame that matches the previous one. Captions go through one interface with four backends: OpenRouter, a self-hosted Qwen2.5-VL on vLLM, Tesseract (CPU, no key), or a mock used by the tests. Results are cached by image hash. Dense vectors default to a hashing embedder so the project runs without downloading BGE; set `EMBEDDING_BACKEND=sentence_transformers` and `EMBEDDING_MODEL=BAAI/bge-m3` when you are ready to download it (`EMBEDDING_DIM=1024`, new collection). Sparse vectors are term frequencies on a stable token hash, with Qdrant's IDF modifier. Hybrid search prefetches `text_dense`, `visual_dense`, and `sparse` and fuses them with reciprocal rank fusion. That hybrid, with the reranker off, is the default. `RERANKER_ENABLED` defaults to false: on these short clips the cross-encoder lowered Recall@1 and about doubled CPU latency. Set `RERANKER_BACKEND=cross_encoder` and `RERANKER_ENABLED=true` to load `BAAI/bge-reranker-v2-m3`. The lexical scorer remains available for tests that must not download weights.
 
 ## Retrieval numbers
 
-Measured, 3 clips, 21 queries, Nov 10 2026. Test split of `eval/queries.cloud.jsonl` (30 rows: 24 test, 6 dev). The three test hard negatives are excluded, which is why `n=21`. Embeddings were the default hashing embedder, not BGE. The reranker was the lexical overlap scorer, not `bge-reranker-v2-m3`. Printed by `eval/run_eval.py` after the Hufsky end frame had been reindexed.
+Measured, 3 clips, 22 test queries, bge-m3 + bge-reranker-v2-m3, CPU, Nov 10 2026. Collection `segments_bge` (12 points, 1024-d). Test split of `eval/queries.cloud.jsonl` (31 rows: 25 test, 6 dev). Three test hard negatives are excluded, which is why `n=22`. Recall@10 is 1.000 for every retriever. No Locust run.
+
+| Retriever | R@1 | R@5 | R@10 | MRR@10 | nDCG@10 |
+|---|---|---|---|---|---|
+| BM25 (sparse) only | 0.909 | 1.000 | 1.000 | 0.947 | 0.950 |
+| Transcript dense only | 0.773 | 1.000 | 1.000 | 0.871 | 0.885 |
+| Text + visual dense | 0.682 | 0.955 | 1.000 | 0.799 | 0.832 |
+| Hybrid (RRF, all three) | 0.909 | 1.000 | 1.000 | 0.943 | 0.940 |
+| Hybrid + cross-encoder | 0.818 | 0.955 | 1.000 | 0.894 | 0.911 |
+
+Search latency on that CPU box, against Qdrant Cloud. Embedding p50 is about 45 ms. The rerank column is the cross-encoder step.
+
+| Retriever | total p50 | total p95 | rerank p50 | rerank p95 |
+|---|---|---|---|---|
+| Hybrid | 623.8 ms | 648.1 ms | — | — |
+| Hybrid + cross-encoder | 1252.3 ms | 1432.1 ms | 653.3 ms | 817.7 ms |
+
+BGE-m3 lifts the dense and hybrid rows over the hashing embedder on this same file (transcript-dense Recall@1 0.682 → 0.773, hybrid 0.864 → 0.909). Hybrid is the best overall: it matches sparse at Recall@1 0.909, keeps Recall@5 and Recall@10 at 1.000, and has the highest nDCG of the runs that use the dense vectors (0.940). Text-plus-visual trails. The cross-encoder does not help at this scale. It drops hybrid Recall@1 from 0.909 to 0.818 and Recall@5 from 1.000 to 0.955, and it about doubles latency (623.8 ms to 1252.3 ms p50), with 653.3 / 817.7 ms of that inside the rerank step. For these short clips the default is hybrid with the reranker off.
+
+Same aligned file, hashing embedder (384-d, collection `segments`) and the lexical reranker. Sparse matches the BGE sparse row because that path does not use the dense model.
 
 | Retriever | R@1 | R@5 | MRR@10 | nDCG@10 |
 |---|---|---|---|---|
-| BM25 (sparse) only | 0.857 | 1.000 | 0.913 | 0.924 |
-| Transcript dense only | 0.667 | 0.952 | 0.816 | 0.851 |
-| Text + visual dense | 0.571 | 1.000 | 0.760 | 0.808 |
-| Hybrid (RRF, all three) | 0.810 | 1.000 | 0.897 | 0.895 |
-| Hybrid + reranker | 0.714 | 1.000 | 0.837 | 0.867 |
+| BM25 (sparse) only | 0.909 | 1.000 | 0.947 | 0.950 |
+| Transcript dense only | 0.682 | 0.955 | 0.817 | 0.863 |
+| Text + visual dense | 0.727 | 1.000 | 0.839 | 0.867 |
+| Hybrid (RRF, all three) | 0.864 | 1.000 | 0.924 | 0.929 |
+| Hybrid + lexical reranker | 0.818 | 1.000 | 0.890 | 0.908 |
 
-Recall@10 was computed by the runner and was not in the printed summary, so it is not in this table. The same is true of a per-type breakdown and of search latency. No Locust run.
-
-On these short clips the useful tokens are rare ("experiment", "Christmas is coming", "talk and sing", the banner words), so sparse ranking beats the hashing embedder. That is not a result about BGE. Adding the visual vector lowers Recall@1: most of the 21 queries are spoken or keyword, and a caption does not carry the spoken phrase. Visual-only search is last, at 0.571. The lexical reranker hurts at this scale. It reorders a handful of windows and drops hybrid Recall@1 from 0.810 to 0.714. Recall@5 is 1.000 for four retrievers and 0.952 for transcript dense, so the right window is almost always in the top five when it is not first.
-
-Caption cost was **$0.0020 total across both runs**, model `qwen/qwen3.7-flash`: $0.00177940 for the first 13 captions, then $0.00024852 for the one new Hufsky frame at 29.85s (the 15.05s frame was a cache hit at $0). The `--max-usd` cap on each run was $0.15.
+Caption cost was **$0.0020 total across both ingest runs**, model `qwen/qwen3.7-flash`: $0.00177940 for the first 13 captions, then $0.00024852 for the one new Hufsky frame at 29.85s (the 15.05s frame was a cache hit at $0). The BGE re-embed and this eval did not call OpenRouter. The `--max-usd` cap on each ingest was $0.15.
 
 The hit rule, the dev/test split, and the JSONL shape are in [eval/README.md](eval/README.md). `eval/queries.sample.jsonl` has four queries for the synthetic clip. It is a format example. The cloud file is the measured set.
 
@@ -122,10 +137,10 @@ Screenshots belong in the demo video you record. None are checked in, so this RE
 - Accents, overlapping speech, and noisy rooms will hurt the timestamps. There is no speaker diarization.
 - A VLM caption can describe a slide that is not there. The cache stores that caption. Tesseract only reads text it can see.
 - The default embedder is a hashing trick, not BGE. Keyword overlap works; paraphrase quality will not, until you switch the backend and reindex.
-- The lexical reranker is not `bge-reranker-v2-m3`. The cross-encoder class is the production path and is unit-tested with a fake model. Downloading the weights is your step.
+- The reranker is off by default. `bge-reranker-v2-m3` is implemented and was measured; on these short clips it did not beat hybrid. The lexical scorer is what the unit tests run.
 - Ray and Celery are implemented and import cleanly. They were not run as a cluster here. The verified worker is the in-process pipeline, with retries per stage.
 - Long videos are rejected at `MAX_VIDEO_SECONDS` (default 4 hours) and `MAX_UPLOAD_BYTES` (default 2 GiB). That is a guard, not a scaling story.
-- The measured table above is 21 scored queries on three short clips with a hashing embedder and a lexical reranker. It is not a BGE or cross-encoder result, and it is not a 150-query set.
+- The headline table is 22 scored queries on three short clips. It is not a 150-query set, and it is not a GPU latency number.
 
 ## Video sources
 

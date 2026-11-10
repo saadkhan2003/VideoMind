@@ -167,9 +167,12 @@ export EMBEDDING_MODEL=BAAI/bge-m3
 export EMBEDDING_DIM=1024
 # delete the old Qdrant collection first; the vector size changed
 
-# real reranker — downloads BAAI/bge-reranker-v2-m3
-export RERANKER_BACKEND=cross_encoder
-export RERANKER_MODEL=BAAI/bge-reranker-v2-m3
+# Optional. On the short clips, leave the reranker off (the default).
+# Hybrid without it beat bge-reranker-v2-m3 and was about half the CPU latency.
+# Uncomment to download the cross-encoder and turn it on.
+# export RERANKER_ENABLED=true
+# export RERANKER_BACKEND=cross_encoder
+# export RERANKER_MODEL=BAAI/bge-reranker-v2-m3
 
 # paid captions
 export CAPTION_BACKEND=openrouter

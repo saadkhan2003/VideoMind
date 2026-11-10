@@ -33,7 +33,7 @@ The pipeline function is the same for every backend. Inline mode runs it on a th
 
 Docker Compose was not started in the build environment. No GPU and no k3s cluster were used here.
 
-A later run on another machine, with keys, measured the three-clip test split on 10 Nov 2026. Those numbers are in the README. Caption spend across both cloud runs was $0.0020 on `qwen/qwen3.7-flash`. The dense vectors in that table are the hashing embedder. The Hetzner VM and the k3s install are still yours to do.
+A later run on another machine, with keys, measured the three-clip test split on 10 Nov 2026. The README headline is `bge-m3` plus `bge-reranker-v2-m3` on CPU (22 scored queries, collection `segments_bge`). The hash embedder is the smaller comparison table. Caption spend across both ingest runs was $0.0020 on `qwen/qwen3.7-flash`. The reranker stays off unless you turn it on. The Hetzner VM and the k3s install are still yours to do.
 
 ## Interview prompts
 

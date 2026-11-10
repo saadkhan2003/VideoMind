@@ -158,7 +158,9 @@ def test_strict_phrase_miss_exits():
 def test_cloud_query_file_covers_three_clips_and_grades():
     path = Path(__file__).resolve().parents[1] / "queries.cloud.jsonl"
     rows = load_jsonl(path)
-    assert len(rows) >= 28
+    assert len(rows) == 31
+    assert sum(row["split"] == "test" for row in rows) == 25
+    assert any(row["query_id"] == "hufsky-spoken" for row in rows)
     videos = {row["video_id"] for row in rows}
     assert videos == {"edison-1920s", "hufsky-data-retention", "talking-tree-2011"}
     types = {row["type"] for row in rows}

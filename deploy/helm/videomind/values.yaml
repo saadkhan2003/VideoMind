@@ -65,6 +65,8 @@ config:
   captionBackend: mock
   embeddingBackend: hash
   embeddingDim: "384"
+  # false: hybrid search, no rerank. Matches the short-clip BGE measurement.
+  rerankerEnabled: "false"
   rerankerBackend: lexical
   s3Endpoint: ""
   s3Bucket: videomind

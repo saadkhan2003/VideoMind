@@ -125,3 +125,4 @@ def test_r2_and_qdrant_cloud_endpoints():
     assert defaults.openrouter_vlm_model == "auto"
     assert defaults.langfuse_host == "https://cloud.langfuse.com"
     assert defaults.r2_bucket == "videomind-media"
+    assert defaults.reranker_enabled is False
