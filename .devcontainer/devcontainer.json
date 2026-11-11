@@ -1,0 +1,25 @@
+{
+  "name": "VideoMind cloud development",
+  "image": "mcr.microsoft.com/devcontainers/python:1-3.12-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22"
+    },
+    "ghcr.io/devcontainers/features/sshd:1": {}
+  },
+  "forwardPorts": [43123, 43124],
+  "portsAttributes": {
+    "43123": {
+      "label": "VideoMind web",
+      "onAutoForward": "notify"
+    },
+    "43124": {
+      "label": "VideoMind API",
+      "onAutoForward": "silent"
+    }
+  },
+  "containerEnv": {
+    "NEXT_TELEMETRY_DISABLED": "1"
+  },
+  "postCreateCommand": "bash .devcontainer/setup.sh"
+}

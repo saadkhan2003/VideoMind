@@ -74,6 +74,10 @@ The hit rule, the dev/test split, and the JSONL shape are in [eval/README.md](ev
 
 ## Run locally
 
+For cloud-only development without laptop installs, use the
+[Codespaces guide](docs/codespaces.md). The cloud setup installs dependencies but
+does not automatically download model weights or call paid APIs.
+
 CPU path, no Docker, no API keys. This is the path that was run in the build environment.
 
 ```bash
