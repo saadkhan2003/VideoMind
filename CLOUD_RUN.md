@@ -1,6 +1,6 @@
 # Cloud run (Saad's machine)
 
-This run uses your own keys. Nothing in this file calls a paid API. The commands below are what you run on a plain Linux box: CPU only, Python 3, [uv](https://docs.astral.sh/uv/), ffmpeg. No GPU.
+This workflow uses your own keys. **The live ingestion command below calls a billable caption API**; the `--dry-run` checks configuration/catalog selection without sending images. Run the workflow in a Linux cloud environment with Python 3, [uv](https://docs.astral.sh/uv/), and FFmpeg. No GPU is required for the default tiny-Whisper path. Set a provider-side spending limit before live ingestion.
 
 The pipeline reads these variables and nothing is hardcoded:
 
@@ -29,7 +29,7 @@ Downloaded by the script. They are not in git.
 | `hufsky-data-retention` | [Demonstration data retention speech, part 1](https://commons.wikimedia.org/wiki/File:Demonstration_data_retention_at_BMVIT_speech_Hufsky_1_2007-06-07.ogv) (~30 s) | CC BY-SA 3.0 | Florian Prischl |
 | `talking-tree-2011` | [Talking tree 2011.webm](https://commons.wikimedia.org/wiki/File:Talking_tree_2011.webm) (~47 s) | CC BY 2.0 | Louise McLaren |
 
-`eval/queries.cloud.jsonl` has 30 graded queries (spoken, visual, keyword, and four hard negatives) across all three clips. A span is `[start, end]` or `[start, end, grade]`. Grade 2 is the exact phrase or the frame that shows it. Grade 1 is a later or partial mention. Hard negatives have an empty span list and are left out of the Recall / MRR / nDCG averages.
+`eval/queries.cloud.jsonl` has 31 rows across all three clips: 25 test and 6 dev, including four hard negatives in total. Three test hard negatives are excluded from the reported retrieval averages, leaving 22 scored test queries. A span is `[start, end]` or `[start, end, grade]`. Grade 2 is the exact phrase or the frame that shows it. Grade 1 is a later or partial mention. Hard negatives have an empty span list and are left out of the Recall / MRR / nDCG averages.
 
 Spoken spans in that file come from one faster-whisper `tiny` pass on these files (word timestamps, VAD on). Tiny does not print the same words on every machine. The Hufsky clip produced no words on that pass, so its labels are visual: the banners readable in the frames (`Freiheit stirbt mit Sicherheit` around 15s, `Demokratie braucht Anonymität` / `STOPPT DATARETENTION` around 28s). Visual spans are the frames that were checked, not a claim about what qwen wrote.
 
@@ -48,7 +48,7 @@ Rerun the labeller against your own transcript and segment rows before you treat
 
 A spoken phrase that is not in the transcript does not abort the run. The helper warns and keeps the fallback spans or the spans already in `--out`. `--strict` exits on that miss (the old behaviour). A spec line with `on_miss: skip` (the Hufsky speech query) is added only when the transcript actually contains the phrase. `tree-talk` is the phrase `talk and sing` (16.14–17.56s on the cloud tiny-whisper pass).
 
-The 10 Nov 2026 test-split numbers are in the README. They were computed on the committed query file before this phrase fix, so a later eval can move `tree-talk` if you realign first.
+The historical 10 Nov 2026 results are documented in the README. Realigning against a new transcript or index can change spans and scores. Record the exact query-file revision and model configuration with each new run rather than assuming it reproduces the historical table.
 
 ## Commands
 
