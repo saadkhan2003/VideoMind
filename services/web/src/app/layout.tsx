@@ -37,8 +37,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-8">{children}</main>
         <footer className="border-t border-border">
           <p className="mx-auto w-full max-w-6xl px-4 py-4 text-xs text-muted-foreground">
-            VideoMind is a portfolio project by Muhammad Saad Khan. Retrieval numbers in the README
-            stay blank until a labeled eval is run.
+            VideoMind is a portfolio project by Muhammad Saad Khan. The README reports measured
+            retrieval results with their dataset size, model configuration, and limitations.
           </p>
         </footer>
       </body>
